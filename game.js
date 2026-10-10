@@ -51,7 +51,7 @@ function qps() {
   if (state.ups.u3) upMult *= 2;
   if (state.ups.u5) upMult *= 3;
   if (state.ups.u6) upMult *= 3;
-  return sum * upMult * realmMult() * daoyunMult();
+  return sum * upMult * realmMult() * daoyunMult() * achMult();
 }
 function tapPower() {
   let t = 1;
@@ -100,6 +100,7 @@ function defaultState() {
   return {
     qi: 0, totalRun: 0, totalAll: 0, realm: 0,
     gens: {}, ups: {}, daoyun: 0, runs: 0,
+    achs: {}, bestOffline: 0,
     lastSave: Date.now(),
   };
 }
@@ -217,6 +218,7 @@ function applyOffline() {
   state.qi += gain;
   state.totalRun += gain;
   state.totalAll += gain;
+  if (gain > (state.bestOffline || 0)) state.bestOffline = gain;
   el.offGain.textContent = '+' + fmt(gain);
   document.querySelector('#modalOffline .modal-text').innerHTML =
     '小修士匆匆跑来：<br>「师尊闭关 <b>' + fmtDur(elapsed) +
@@ -378,7 +380,7 @@ function bindUI() {
       renderShop();
     }));
 
-  $('btnSettings').addEventListener('click', () => openModal('modalSettings'));
+  $('btnSettings').addEventListener('click', () => { renderAchs(); openModal('modalSettings'); });
   $('btnSettingsClose').addEventListener('click', () => closeModal('modalSettings'));
   $('btnOffOk').addEventListener('click', () => closeModal('modalOffline'));
   document.querySelectorAll('.modal').forEach((m) =>
@@ -423,6 +425,7 @@ function init() {
   loadState();
   bindUI();
   applyOffline();
+  checkAchs(true); // 老存档已有达标的成就先静默补记，不刷提示
   renderMain();
   lastSig = '';
   tickShop();

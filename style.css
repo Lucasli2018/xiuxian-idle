@@ -409,6 +409,56 @@ body {
 @keyframes fx-in { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes fx-text { 0% { transform: scale(.6); opacity: 0; } 25% { transform: scale(1.08); opacity: 1; } 45% { transform: scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
 
+/* ---------- 成就 · 道果录 ---------- */
+.ach-title {
+  font-family: var(--font-kai);
+  color: var(--gold);
+  font-size: 15px; letter-spacing: 2px;
+  margin: 16px 0 8px;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.ach-title small { font-size: 11px; color: var(--paper-dim); letter-spacing: 1px; }
+.ach-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 200px; overflow-y: auto;
+  margin-bottom: 14px;
+}
+.ach-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(53, 40, 31, .55);
+  border: 1px solid rgba(216, 162, 74, .12);
+  font-size: 13px;
+}
+.ach-item.done { border-color: rgba(255, 122, 89, .45); background: rgba(255, 122, 89, .10); }
+.ach-mark { color: var(--paper-dim); font-size: 13px; }
+.ach-item.done .ach-mark { color: var(--coral); }
+.ach-name { font-family: var(--font-kai); color: var(--paper); letter-spacing: 1px; }
+.ach-item.done .ach-name { color: var(--coral-soft); }
+.ach-desc { flex: 1; color: var(--paper-dim); font-size: 11px; }
+.ach-bonus { color: var(--gold-soft); font-size: 12px; }
+.ach-item:not(.done) .ach-bonus { opacity: .45; }
+
+/* ---------- 成就 Toast ---------- */
+.toast {
+  position: fixed; left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 84px);
+  transform: translateX(-50%) translateY(20px);
+  z-index: 70;
+  background: linear-gradient(135deg, var(--ink-3), var(--ink-2));
+  border: 1px solid rgba(216, 162, 74, .5);
+  color: var(--gold-soft);
+  font-family: var(--font-kai);
+  font-size: 15px; letter-spacing: 1px;
+  padding: 10px 22px; border-radius: 999px;
+  box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease;
+  max-width: 86vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 @media (min-width: 481px) {
   body { background-attachment: fixed; }
 }
