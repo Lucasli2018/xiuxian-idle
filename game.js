@@ -37,18 +37,63 @@ function fmt(n) {
   return n.toExponential(2).replace('e+', 'e');
 }
 
-/* ---------------- 数值计算 ----------------
-   天地灵气：基础的自动产出，境界与道韵会放大它；
-   门人弟子的产出在功法页开放后叠加。 */
+/* ---------------- 数值计算 ---------------- */
 function realmMult() { return Math.pow(3, state.realm); }
 function daoyunMult() { return 1 + 0.02 * state.daoyun; }
-function qps() { return 0.2 * realmMult() * daoyunMult(); }
-function tapPower() { return 1 * realmMult() * daoyunMult(); }
+function qps() {
+  let sum = 0.2; // 天地灵气（基础自动产出）
+  for (const g of GENS) {
+    const lv = state.gens[g.id] || 0;
+    if (lv > 0) sum += lv * g.prod * Math.pow(2, Math.floor(lv / 25)); // 每 25 级产出翻倍
+  }
+  let upMult = 1;
+  if (state.ups.u2) upMult *= 1.5;
+  if (state.ups.u3) upMult *= 2;
+  if (state.ups.u5) upMult *= 3;
+  if (state.ups.u6) upMult *= 3;
+  return sum * upMult * realmMult() * daoyunMult();
+}
+function tapPower() {
+  let t = 1;
+  if (state.ups.u1) t *= 2;
+  if (state.ups.u4) t *= 3;
+  return t * realmMult() * daoyunMult();
+}
 
 /* ---------------- 境界 ---------------- */
 const REALMS = ['炼气期', '筑基期', '金丹期', '元婴期', '化神期',
                 '炼虚期', '合体期', '大乘期', '渡劫期', '仙人'];
 function breakCost() { return 200 * Math.pow(10, state.realm); }
+
+/* ---------------- 弟子（生成器） ---------------- */
+const COST_GROWTH = 1.15;
+const GENS = [
+  { id: 'servant', name: '杂役弟子', desc: '挑水劈柴，偶得灵气', cost: 15,     prod: 0.5 },
+  { id: 'outer',   name: '外门弟子', desc: '晨钟暮鼓，吐纳有序', cost: 120,    prod: 4 },
+  { id: 'inner',   name: '内门弟子', desc: '宗门真传，日进斗金', cost: 1500,   prod: 26 },
+  { id: 'elder',   name: '真传长老', desc: '一念风雷，坐镇山门', cost: 20000,  prod: 170 },
+  { id: 'sect',    name: '一宗之主', desc: '执掌灵脉，言出法随', cost: 260000, prod: 1200 },
+];
+function genCost(g, n) { // 买 n 名的总价（等比求和）
+  const lv = state.gens[g.id] || 0;
+  const c0 = g.cost * Math.pow(COST_GROWTH, lv);
+  return Math.ceil(c0 * (Math.pow(COST_GROWTH, n) - 1) / (COST_GROWTH - 1));
+}
+function genUnlocked(g, idx) {
+  if (idx === 0) return true;
+  const prev = GENS[idx - 1];
+  return (state.gens[prev.id] || 0) >= 1 || state.totalAll >= g.cost * 0.4;
+}
+
+/* ---------------- 功法法宝（一次性永久强化） ---------------- */
+const UPS = [
+  { id: 'u1', name: '《吐纳诀》',   desc: '打坐收益 ×2',   cost: 100,     unlock: () => state.totalAll >= 50 },
+  { id: 'u2', name: '聚灵阵·残卷', desc: '灵气产出 +50%', cost: 600,     unlock: () => (state.gens.servant || 0) >= 10 },
+  { id: 'u3', name: '五行灵根',     desc: '灵气产出 ×2',   cost: 6000,    unlock: () => state.realm >= 1 },
+  { id: 'u4', name: '《御风诀》',   desc: '打坐收益 ×3',   cost: 30000,   unlock: () => state.totalAll >= 10000 },
+  { id: 'u5', name: '周天星斗大阵', desc: '灵气产出 ×3',   cost: 250000,  unlock: () => state.realm >= 2 },
+  { id: 'u6', name: '《大衍诀》',   desc: '灵气产出 ×3',   cost: 3000000, unlock: () => state.realm >= 3 },
+];
 
 /* ---------------- 存档 ---------------- */
 function defaultState() {
@@ -179,8 +224,120 @@ function applyOffline() {
   setTimeout(() => openModal('modalOffline'), 400);
 }
 
+/* ---------------- 功法商店 ---------------- */
+let buyMode = 1;
+let lastSig = '';
+const shopRefs = { gens: [], ups: [] };
+
+function buyGen(g) {
+  const cost = genCost(g, buyMode);
+  if (state.qi < cost) return;
+  state.qi -= cost;
+  state.gens[g.id] = (state.gens[g.id] || 0) + buyMode;
+  renderShop();
+  renderMain();
+}
+function buyUp(u) {
+  if (state.ups[u.id] || state.qi < u.cost) return;
+  state.qi -= u.cost;
+  state.ups[u.id] = true;
+  renderShop();
+  renderMain();
+}
+
+function renderShop() {
+  el.genList.innerHTML = '';
+  shopRefs.gens = [];
+  GENS.forEach((g, idx) => {
+    if (!genUnlocked(g, idx)) return;
+    const lv = state.gens[g.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'gen-card';
+    card.innerHTML =
+      '<div class="gen-info">' +
+        '<div class="gen-name">' + g.name + '<span class="lv">Lv.' + lv + '</span></div>' +
+        '<div class="gen-desc">' + g.desc + '</div>' +
+        '<div class="gen-prod">每名 +' + fmt(g.prod) + ' 灵气/秒' +
+          (lv >= 25 ? '（周天加成已激活）' : '（25 级产出翻倍）') + '</div>' +
+      '</div>' +
+      '<button class="gen-buy">招募 ×' + buyMode + '<small>' + fmt(genCost(g, buyMode)) + ' 灵气</small></button>';
+    card.querySelector('.gen-buy').addEventListener('click', () => buyGen(g));
+    el.genList.appendChild(card);
+    shopRefs.gens.push({ g, btn: card.querySelector('.gen-buy') });
+  });
+
+  el.upList.innerHTML = '';
+  shopRefs.ups = [];
+  UPS.forEach((u) => {
+    const owned = !!state.ups[u.id];
+    if (!owned && !u.unlock()) return;
+    const card = document.createElement('div');
+    card.className = 'up-card' + (owned ? ' owned' : '');
+    card.innerHTML =
+      '<div class="up-info">' +
+        '<div class="up-name">' + u.name + '</div>' +
+        '<div class="up-desc">' + u.desc + (owned ? ' · 已修成' : '') + '</div>' +
+      '</div>' +
+      '<button class="up-buy"' + (owned ? ' disabled' : '') + '>' +
+        (owned ? '已 修 成' : '参 悟<small>' + fmt(u.cost) + ' 灵气</small>') +
+      '</button>';
+    if (!owned) card.querySelector('.up-buy').addEventListener('click', () => buyUp(u));
+    el.upList.appendChild(card);
+    if (!owned) shopRefs.ups.push({ u, btn: card.querySelector('.up-buy') });
+  });
+  refreshShopAfford();
+}
+
+function refreshShopAfford() {
+  shopRefs.gens.forEach(({ g, btn }) => { btn.disabled = state.qi < genCost(g, buyMode); });
+  shopRefs.ups.forEach(({ u, btn }) => { btn.disabled = state.qi < u.cost; });
+}
+function shopSignature() {
+  return GENS.map((g, i) => (genUnlocked(g, i) ? '1' : '0')).join('') + '|' +
+         UPS.map((u) => (state.ups[u.id] ? '1' : (u.unlock() ? 'v' : '0'))).join('');
+}
+function tickShop() {
+  const sig = shopSignature();
+  if (sig !== lastSig) { lastSig = sig; renderShop(); }
+  else refreshShopAfford();
+}
+
+/* ---------------- 转世轮回 ---------------- */
+const PRESTIGE_REQ = 1e6;
+function daoyunGain() { return Math.floor(Math.sqrt(state.totalRun / PRESTIGE_REQ)); }
+function renderPrestige() {
+  const gain = daoyunGain();
+  const can = gain >= 1;
+  el.btnPrestige.disabled = !can;
+  el.prestigeReq.textContent = can
+    ? '轮回可得 ' + fmt(gain) + ' 点道韵'
+    : '本世累计 ' + fmt(state.totalRun) + ' / ' + fmt(PRESTIGE_REQ) + ' 灵气后可轮回';
+}
+function doPrestige() {
+  const gain = daoyunGain();
+  if (gain < 1) return;
+  if (!confirm('转世轮回将散尽修为（灵气 / 弟子 / 功法 / 境界清零），\n换取 ' + gain + ' 点道韵（每点永久 +2% 产出）。\n\n确定转世？')) return;
+  state.daoyun += gain;
+  state.runs++;
+  state.qi = 0; state.totalRun = 0; state.realm = 0;
+  state.gens = {}; state.ups = {};
+  saveState();
+  renderMain(); renderShop(); renderPrestige();
+  switchTab('main');
+}
+
+/* ---------------- 存档导入导出 ---------------- */
+function encodeSave() { return btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
+function decodeSave(str) { return JSON.parse(decodeURIComponent(escape(atob(str)))); }
+function resetGame() {
+  Object.assign(state, defaultState());
+  saveState();
+  renderMain(); renderShop(); renderPrestige();
+}
+
 /* ---------------- 主循环 ---------------- */
 let lastTick = performance.now();
+let shopTimer = 0;
 function tick(now) {
   const dt = Math.min((now - lastTick) / 1000, 1); // 秒，切后台回来不会暴涨
   lastTick = now;
@@ -191,6 +348,7 @@ function tick(now) {
     state.totalAll += gain;
   }
   renderMain();
+  if (now - shopTimer > 250) { shopTimer = now; tickShop(); renderPrestige(); }
   requestAnimationFrame(tick);
 }
 
@@ -212,18 +370,51 @@ function bindUI() {
   document.querySelectorAll('.tab-btn').forEach((b) =>
     b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
+  document.querySelectorAll('.mode-btn').forEach((b) =>
+    b.addEventListener('click', () => {
+      buyMode = Number(b.dataset.mode);
+      document.querySelectorAll('.mode-btn').forEach((x) =>
+        x.classList.toggle('active', x === b));
+      renderShop();
+    }));
+
   $('btnSettings').addEventListener('click', () => openModal('modalSettings'));
   $('btnSettingsClose').addEventListener('click', () => closeModal('modalSettings'));
   $('btnOffOk').addEventListener('click', () => closeModal('modalOffline'));
   document.querySelectorAll('.modal').forEach((m) =>
     m.addEventListener('click', (e) => { if (e.target === m) closeModal(m.id); }));
 
-  // v3 将接入真实导出/导入/重置
-  $('btnExport').addEventListener('click', () => alert('导出功能将在下个版本开放'));
-  $('btnImport').addEventListener('click', () => alert('导入功能将在下个版本开放'));
-  $('btnReset').addEventListener('click', () => alert('重置功能将在下个版本开放'));
-  $('btnPrestige').addEventListener('click', () => alert('轮回功能将在下个版本开放'));
   el.btnBreak.addEventListener('click', doBreakthrough);
+  el.btnPrestige.addEventListener('click', doPrestige);
+
+  $('btnExport').addEventListener('click', () => {
+    saveState();
+    const code = encodeSave();
+    $('importArea').value = code;
+    $('importArea').select();
+    if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+    alert('存档码已生成并复制到剪贴板（文本框中同时显示）');
+  });
+  $('btnImport').addEventListener('click', () => {
+    const str = $('importArea').value.trim();
+    if (!str) { alert('请先在文本框粘贴存档码'); return; }
+    try {
+      const data = decodeSave(str);
+      if (typeof data.qi !== 'number' || typeof data.realm !== 'number') throw new Error('bad');
+      Object.assign(state, defaultState(), data);
+      saveState();
+      renderMain(); renderShop();
+      alert('导入成功，欢迎回到仙途！');
+      closeModal('modalSettings');
+    } catch (e) { alert('存档码无效，请检查后重试'); }
+  });
+  $('btnReset').addEventListener('click', () => {
+    if (!confirm('确定重置全部修行进度？此操作不可恢复！')) return;
+    if (!confirm('再次确认：真的要从炼气期重新开始吗？')) return;
+    resetGame();
+    alert('大道重开，道友请重新修行～');
+    closeModal('modalSettings');
+  });
 }
 
 /* ---------------- 启动 ---------------- */
@@ -233,8 +424,9 @@ function init() {
   bindUI();
   applyOffline();
   renderMain();
-  el.btnPrestige.disabled = true;
-  el.prestigeReq.textContent = '轮回之法将在下个版本开放';
+  lastSig = '';
+  tickShop();
+  renderPrestige();
   requestAnimationFrame(tick);
 
   setInterval(saveState, 5000);
