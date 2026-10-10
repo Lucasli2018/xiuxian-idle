@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#201a17">
+  <title>仙途挂机 · 修仙放置 Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header class="topbar">
+      <div class="logo">仙途<span>挂机</span></div>
+      <div class="top-sub">结庐人间 · 静待飞升</div>
+      <button id="btnSettings" class="icon-btn" aria-label="设置">⚙</button>
+    </header>
+
+    <main id="main">
+
+      <!-- 修炼 -->
+      <section id="tab-main" class="tab active">
+        <div class="realm-card">
+          <div class="realm-head">
+            <span class="realm-tag">当前境界</span>
+            <span class="realm-name" id="realmName">炼气期</span>
+          </div>
+          <div class="realm-progress">
+            <div class="bar"><i id="realmBar"></i></div>
+            <div class="bar-text" id="realmBarText">0 / 200</div>
+          </div>
+          <button id="btnBreak" class="btn-break" disabled>突破 · 筑基期</button>
+        </div>
+
+        <div class="qi-card">
+          <div class="qi-label">灵 气</div>
+          <div class="qi-num" id="qiNum">0</div>
+          <div class="qi-rate" id="qiRate">+0 / 秒</div>
+        </div>
+
+        <div class="hero-area" id="heroArea">
+          <img src="assets/hero.jpg" id="heroImg" alt="修士打坐" draggable="false">
+        </div>
+
+        <button id="btnMeditate" class="btn-meditate">打 坐 修 炼</button>
+        <p class="tip">点击主角或按钮即可吐纳纳气，离线也会持续汇聚灵气</p>
+      </section>
+
+      <!-- 功法 -->
+      <section id="tab-shop" class="tab">
+        <div class="shop-head">
+          <h2 class="sec-title">门人弟子<small>自动汇聚灵气 · 每 25 级产出翻倍</small></h2>
+          <div class="buy-mode">
+            <button class="mode-btn active" data-mode="1">×1</button>
+            <button class="mode-btn" data-mode="10">×10</button>
+          </div>
+        </div>
+        <div id="genList" class="gen-list"></div>
+
+        <h2 class="sec-title">功法 · 法宝<small>一次性永久强化</small></h2>
+        <div id="upList" class="up-list"></div>
+      </section>
+
+      <!-- 轮回 -->
+      <section id="tab-prestige" class="tab">
+        <div class="prestige-card">
+          <div class="dy-symbol">☯</div>
+          <h2 class="sec-title center">转世轮回<small>散尽修为，换取大道感悟「道韵」</small></h2>
+          <div class="dy-rows">
+            <div class="dy-row"><span>已有道韵</span><b id="dyCount" class="coral">0</b></div>
+            <div class="dy-row"><span>轮回加成</span><b id="dyMult">×1.00</b></div>
+            <div class="dy-row"><span>轮回次数</span><b id="dyRuns">0</b></div>
+          </div>
+          <p class="dy-hint" id="prestigeReq">本世累计灵气达 100万 后可轮回</p>
+          <button id="btnPrestige" class="btn-prestige" disabled>转世轮回</button>
+          <p class="tip">轮回将清空灵气、弟子、功法与境界，道韵与轮回加成永久保留（每点道韵 +2% 全局产出）</p>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab-btn active" data-tab="main">修 炼</button>
+      <button class="tab-btn" data-tab="shop">功 法</button>
+      <button class="tab-btn" data-tab="prestige">轮 回</button>
+    </nav>
+  </div>
+
+  <!-- 离线收益 -->
+  <div id="modalOffline" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-title">闭关归来</div>
+      <p class="modal-text">小修士匆匆跑来：<br>「师尊闭关期间，门下弟子共汇聚灵气——」</p>
+      <div class="off-gain" id="offGain">+0</div>
+      <p class="tip">离线效率 50% · 上限 8 小时</p>
+      <button id="btnOffOk" class="btn-primary">收 下</button>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div id="modalSettings" class="modal hidden">
+    <div class="modal-panel">
+      <div class="modal-title">设 置</div>
+      <div class="stat-rows">
+        <div class="dy-row"><span>累计获取灵气</span><b id="statTotal">0</b></div>
+        <div class="dy-row"><span>轮回次数</span><b id="statRuns">0</b></div>
+        <div class="dy-row"><span>道韵</span><b id="statDaoyun">0</b></div>
+      </div>
+      <textarea id="importArea" class="import-area" placeholder="粘贴存档码后点击导入" spellcheck="false"></textarea>
+      <div class="btn-row">
+        <button id="btnExport" class="btn-ghost">导出存档</button>
+        <button id="btnImport" class="btn-ghost">导入存档</button>
+      </div>
+      <div class="btn-row">
+        <button id="btnReset" class="btn-danger">重置修行</button>
+        <button id="btnSettingsClose" class="btn-primary">关 闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 突破特效 -->
+  <div id="breakFx" class="break-fx hidden">
+    <img src="assets/breakthrough.jpg" alt="">
+    <div class="break-text" id="breakText">突破！</div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
