@@ -303,6 +303,55 @@ function doBreakthrough() {
   setTimeout(() => fx.classList.add('hidden'), 1800);
   saveState();
   renderMain();
+  state.tribDone = false; // 突破后重置，本境界可再次历劫
+  if (tribModalOpen) { tribModalOpen = false; closeModal('modalTrib'); } // 历劫途中突破，关闭劫面板
+}
+
+/* ---------------- 天劫 · 心魔劫 ----------------
+   灵气达到「突破所需 2 倍」时触发；迎劫有成功率（随渡劫次数提升），
+   成功得灵气与道韵，失败折损灵气四成（心魔劫）。突破后重置。 */
+let tribModalOpen = false;
+let tribDeferUntil = 0;
+function tribProb() { return Math.min(0.4 + 0.1 * state.tribWins, 0.9); }
+function maybeTrib() {
+  if (state.tribDone || tribModalOpen) return;
+  if (state.realm >= REALMS.length - 1) return;        // 已飞升不再有劫
+  if (Date.now() < tribDeferUntil) return;             // 暂避冷却中
+  if (state.qi >= breakCost() * 2) openTribModal();
+}
+function openTribModal() {
+  const prob = Math.round(tribProb() * 100);
+  const qiReward = state.totalRun * 0.1;
+  const dyReward = Math.floor(state.totalRun / 1e7);
+  $('modalTrib').querySelector('.trib-rows').innerHTML =
+    '<b>迎劫成功率　' + prob + '%</b>' +
+    '<div>当前灵气：' + fmt(state.qi) + '</div>' +
+    '<div>渡劫成功：灵气 +' + fmt(qiReward) + ' · 道韵 +' + fmt(dyReward) + '</div>' +
+    '<div>渡劫失败（心魔劫）：灵气折损 40%</div>';
+  tribModalOpen = true;
+  openModal('modalTrib');
+}
+function doTribulation() {
+  closeModal('modalTrib');
+  tribModalOpen = false;
+  const success = Math.random() < tribProb();
+  state.tribDone = true;
+  if (success) {
+    const qiReward = state.totalRun * 0.1;
+    const dyReward = Math.floor(state.totalRun / 1e7);
+    state.qi += qiReward; state.totalRun += qiReward; state.totalAll += qiReward;
+    state.daoyun += dyReward; state.tribWins++;
+    showToast('⚡ 渡劫成功！灵气 +' + fmt(qiReward) + ' · 道韵 +' + fmt(dyReward));
+  } else {
+    state.qi *= 0.6;
+    showToast('✦ 心魔劫起，灵气折损四成——再修再来');
+  }
+  renderMain(); saveState();
+}
+function deferTrib() {
+  closeModal('modalTrib');
+  tribModalOpen = false;
+  tribDeferUntil = Date.now() + 90000; // 暂避 90 秒
 }
 
 /* ---------------- 离线收益 ---------------- */
@@ -488,7 +537,7 @@ function bindUI() {
   $('btnSettingsClose').addEventListener('click', () => closeModal('modalSettings'));
   $('btnOffOk').addEventListener('click', () => closeModal('modalOffline'));
   document.querySelectorAll('.modal').forEach((m) =>
-    m.addEventListener('click', (e) => { if (e.target === m) closeModal(m.id); }));
+    m.addEventListener('click', (e) => { if (e.target === m) { closeModal(m.id); if (m.id === 'modalTrib') tribModalOpen = false; } }));
 
   el.btnBreak.addEventListener('click', doBreakthrough);
   el.btnPrestige.addEventListener('click', doPrestige);
