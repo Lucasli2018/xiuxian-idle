@@ -459,6 +459,43 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---------- 灵宠 ---------- */
+.pet-list { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 8px; }
+.pet-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 14px;
+  background: rgba(53, 40, 31, .5);
+  border: 1px solid rgba(216, 162, 74, .15);
+}
+.pet-card.owned { border-color: rgba(255, 122, 89, .5); background: rgba(255, 122, 89, .08); }
+.pet-badge {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-kai); font-size: 22px; color: #fff; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--coral), var(--gold));
+  box-shadow: 0 0 14px rgba(255, 122, 89, .4);
+}
+.pet-info { flex: 1; min-width: 0; }
+.pet-name { font-family: var(--font-kai); font-size: 16px; color: var(--paper); letter-spacing: 1px; }
+.pet-root { font-size: 11px; color: var(--gold-soft); margin-left: 6px; }
+.pet-eff { font-size: 12px; color: var(--paper-dim); margin-top: 2px; }
+.pet-buy {
+  border: none; border-radius: 12px; cursor: pointer;
+  padding: 9px 14px; font-family: var(--font-kai); font-size: 13px;
+  background: linear-gradient(135deg, var(--coral), var(--coral-deep)); color: #fff; white-space: nowrap;
+}
+.pet-buy:disabled {
+  background: transparent; border: 1px solid rgba(216, 162, 74, .4);
+  color: var(--gold-soft); cursor: default;
+}
+.pet-buy small { display: block; font-size: 10px; opacity: .9; margin-top: 1px; }
+
+/* ---------- 天劫 ---------- */
+.trib-panel { max-width: 360px; }
+.trib-rows { display: flex; flex-direction: column; gap: 2px; margin: 14px 0 4px; font-size: 13px; }
+.trib-rows > div { color: var(--paper-dim); }
+.trib-rows > b { color: var(--paper); font-size: 16px; margin-bottom: 8px; }
+
 @media (min-width: 481px) {
   body { background-attachment: fixed; }
 }

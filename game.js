@@ -56,13 +56,13 @@ function qps() {
   if (state.ups.u3) upMult *= 2;
   if (state.ups.u5) upMult *= 3;
   if (state.ups.u6) upMult *= 3;
-  return sum * upMult * realmMult() * daoyunMult() * achMult();
+  return sum * upMult * realmMult() * daoyunMult() * achMult() * petProdMult();
 }
 function tapPower() {
   let t = 1;
   if (state.ups.u1) t *= 2;
   if (state.ups.u4) t *= 3;
-  return t * realmMult() * daoyunMult() * achMult();
+  return t * realmMult() * daoyunMult() * achMult() * petTapMult();
 }
 
 /* ---------------- 境界 ---------------- */
@@ -112,6 +112,56 @@ const ACHS = [
   { id: 'a7', name: '轮回往生', desc: '完成一次转世轮回',     bonus: 0.10, cond: () => state.runs >= 1 },
   { id: 'a8', name: '闭关奇遇', desc: '单次闭关收益达 1万',   bonus: 0.05, cond: () => state.bestOffline >= 1e4 },
 ];
+/* ---------------- 灵宠（结伴仙兽，永久加成） ---------------- */
+const PETS = [
+  { id: 'fox',  name: '灵狐·赤焰', glyph: '狐', root: '火灵根',   cost: 5000,    eff: '全局灵气产出 +8%',           prod: 0.08 },
+  { id: 'luan', name: '青鸾·御风', glyph: '鸾', root: '风灵根',   cost: 30000,   eff: '打坐收益 +15%',              tap: 0.15 },
+  { id: 'xuan', name: '玄武·玄水', glyph: '武', root: '水灵根',   cost: 200000,  eff: '离线效率 50% → 75%',         offline: 0.25 },
+  { id: 'ze',   name: '白泽·通灵', glyph: '泽', root: '先天灵兽', cost: 2000000, eff: '全局产出 +15% · 道韵 +10%',  prod: 0.15, dy: 0.10 },
+];
+function petProdMult()  { let m = 1; for (const p of PETS) if (state.pets[p.id] && p.prod)    m += p.prod;    return m; }
+function petTapMult()   { let m = 1; for (const p of PETS) if (state.pets[p.id] && p.tap)     m += p.tap;     return m; }
+function petOfflineAdd(){ let a = 0; for (const p of PETS) if (state.pets[p.id] && p.offline) a += p.offline; return a; }
+function petDyMult()    { let m = 1; for (const p of PETS) if (state.pets[p.id] && p.dy)     m += p.dy;      return m; }
+
+const petRefs = [];
+function buyPet(p) {
+  if (state.pets[p.id] || state.qi < p.cost) return;
+  state.qi -= p.cost;
+  state.pets[p.id] = true;
+  renderPet();
+  renderMain();
+}
+function renderPet() {
+  const list = el.petList;
+  if (!list) return;
+  list.innerHTML = '';
+  petRefs.length = 0;
+  PETS.forEach((p) => {
+    const owned = !!state.pets[p.id];
+    const card = document.createElement('div');
+    card.className = 'pet-card' + (owned ? ' owned' : '');
+    card.innerHTML =
+      '<div class="pet-badge">' + p.glyph + '</div>' +
+      '<div class="pet-info">' +
+        '<div class="pet-name">' + p.name + '<span class="pet-root">' + p.root + '</span></div>' +
+        '<div class="pet-eff">' + p.eff + '</div>' +
+      '</div>' +
+      (owned
+        ? '<button class="pet-buy" disabled>已结伴</button>'
+        : '<button class="pet-buy">结伴<small>' + fmt(p.cost) + ' 灵气</small></button>');
+    if (!owned) {
+      const btn = card.querySelector('.pet-buy');
+      btn.addEventListener('click', () => buyPet(p));
+      petRefs.push({ p, btn });
+    }
+    list.appendChild(card);
+  });
+}
+function refreshPetAfford() {
+  petRefs.forEach(({ p, btn }) => { btn.disabled = state.qi < p.cost; });
+}
+
 function achMult() {
   let m = 1;
   for (const a of ACHS) if (state.achs[a.id]) m += a.bonus;
@@ -268,7 +318,7 @@ function fmtDur(sec) {
 function applyOffline() {
   const elapsed = Math.min((Date.now() - state.lastSave) / 1000, OFFLINE_CAP);
   if (elapsed < 60) return; // 1 分钟内不算闭关
-  const gain = qps() * elapsed * OFFLINE_RATE;
+  const gain = qps() * elapsed * (OFFLINE_RATE + petOfflineAdd());
   if (gain <= 0) return;
   state.qi += gain;
   state.totalRun += gain;
@@ -360,7 +410,7 @@ function tickShop() {
 
 /* ---------------- 转世轮回 ---------------- */
 const PRESTIGE_REQ = 1e6;
-function daoyunGain() { return Math.floor(Math.sqrt(state.totalRun / PRESTIGE_REQ)); }
+function daoyunGain() { return Math.floor(Math.sqrt(state.totalRun / PRESTIGE_REQ) * petDyMult()); }
 function renderPrestige() {
   const gain = daoyunGain();
   const can = gain >= 1;
@@ -483,6 +533,7 @@ function init() {
   lastSig = '';
   tickShop();
   renderPrestige();
+  renderPet();
   checkAchs(true); // 老存档已有达标的成就先静默补记，不刷提示
   requestAnimationFrame(tick);
 
