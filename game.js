@@ -38,12 +38,17 @@ function fmt(n) {
 }
 
 /* ---------------- 数值计算 ----------------
-   v1 阶段：弟子 / 功法列表尚未加入，产出暂时为 0；
-   机制函数先定型，后续版本填充。 */
+   天地灵气：基础的自动产出，境界与道韵会放大它；
+   门人弟子的产出在功法页开放后叠加。 */
 function realmMult() { return Math.pow(3, state.realm); }
 function daoyunMult() { return 1 + 0.02 * state.daoyun; }
-function qps() { return 0; }
+function qps() { return 0.2 * realmMult() * daoyunMult(); }
 function tapPower() { return 1 * realmMult() * daoyunMult(); }
+
+/* ---------------- 境界 ---------------- */
+const REALMS = ['炼气期', '筑基期', '金丹期', '元婴期', '化神期',
+                '炼虚期', '合体期', '大乘期', '渡劫期', '仙人'];
+function breakCost() { return 200 * Math.pow(10, state.realm); }
 
 /* ---------------- 存档 ---------------- */
 function defaultState() {
@@ -77,10 +82,30 @@ function cacheEls() {
   el.upList = $('upList');
 }
 
+function renderRealm() {
+  el.realmName.textContent = REALMS[state.realm];
+  if (state.realm >= REALMS.length - 1) {
+    el.realmBar.style.width = '100%';
+    el.realmBarText.textContent = '已证仙人之道，大道圆满';
+    el.btnBreak.disabled = true;
+    el.btnBreak.textContent = '飞升圆满';
+    el.btnBreak.classList.remove('ready');
+    return;
+  }
+  const cost = breakCost();
+  el.realmBar.style.width = Math.min(100, (state.qi / cost) * 100) + '%';
+  el.realmBarText.textContent = fmt(Math.min(state.qi, cost)) + ' / ' + fmt(cost);
+  el.btnBreak.textContent = '突破 · ' + REALMS[state.realm + 1];
+  const ready = state.qi >= cost;
+  el.btnBreak.disabled = !ready;
+  el.btnBreak.classList.toggle('ready', ready);
+}
+
 function renderMain() {
   el.qiNum.textContent = fmt(state.qi);
   const rate = qps();
   el.qiRate.textContent = '+' + fmt(rate) + ' / 秒';
+  renderRealm();
   el.dyCount.textContent = fmt(state.daoyun);
   el.dyMult.textContent = '×' + daoyunMult().toFixed(2);
   el.dyRuns.textContent = String(state.runs);
@@ -110,6 +135,48 @@ function meditate(x, y) {
   state.totalAll += gain;
   if (x !== undefined) spawnFloat(x, y, '+' + fmt(gain));
   renderMain();
+}
+
+/* ---------------- 境界突破 ---------------- */
+function doBreakthrough() {
+  const cost = breakCost();
+  if (state.qi < cost || state.realm >= REALMS.length - 1) return;
+  state.qi -= cost;
+  state.realm++;
+  const fx = $('breakFx');
+  $('breakText').textContent = '突破！' + REALMS[state.realm];
+  fx.classList.remove('hidden');
+  fx.style.animation = 'none';
+  void fx.offsetWidth; // 重启动画
+  fx.style.animation = '';
+  setTimeout(() => fx.classList.add('hidden'), 1800);
+  saveState();
+  renderMain();
+}
+
+/* ---------------- 离线收益 ---------------- */
+const OFFLINE_CAP = 8 * 3600;   // 8 小时
+const OFFLINE_RATE = 0.5;       // 离线效率 50%
+function fmtDur(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return h + ' 小时 ' + m + ' 分';
+  if (m > 0) return m + ' 分钟';
+  return Math.floor(sec) + ' 秒';
+}
+function applyOffline() {
+  const elapsed = Math.min((Date.now() - state.lastSave) / 1000, OFFLINE_CAP);
+  if (elapsed < 60) return; // 1 分钟内不算闭关
+  const gain = qps() * elapsed * OFFLINE_RATE;
+  if (gain <= 0) return;
+  state.qi += gain;
+  state.totalRun += gain;
+  state.totalAll += gain;
+  el.offGain.textContent = '+' + fmt(gain);
+  document.querySelector('#modalOffline .modal-text').innerHTML =
+    '小修士匆匆跑来：<br>「师尊闭关 <b>' + fmtDur(elapsed) +
+    '</b>，门下弟子共汇聚灵气——」';
+  setTimeout(() => openModal('modalOffline'), 400);
 }
 
 /* ---------------- 主循环 ---------------- */
@@ -156,7 +223,7 @@ function bindUI() {
   $('btnImport').addEventListener('click', () => alert('导入功能将在下个版本开放'));
   $('btnReset').addEventListener('click', () => alert('重置功能将在下个版本开放'));
   $('btnPrestige').addEventListener('click', () => alert('轮回功能将在下个版本开放'));
-  $('btnBreak').addEventListener('click', () => alert('突破功能将在下个版本开放'));
+  el.btnBreak.addEventListener('click', doBreakthrough);
 }
 
 /* ---------------- 启动 ---------------- */
@@ -164,8 +231,8 @@ function init() {
   cacheEls();
   loadState();
   bindUI();
+  applyOffline();
   renderMain();
-  el.btnBreak.disabled = true;
   el.btnPrestige.disabled = true;
   el.prestigeReq.textContent = '轮回之法将在下个版本开放';
   requestAnimationFrame(tick);
