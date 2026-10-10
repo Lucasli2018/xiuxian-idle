@@ -17,6 +17,11 @@ const state = {
   ups: {},          // 已购功法 { id: true }
   daoyun: 0,        // 道韵（轮回永久货币）
   runs: 0,          // 轮回次数
+  achs: {},         // 已解锁成就（道果）{ id: true }
+  bestOffline: 0,   // 单次最大闭关收益（成就用）
+  pets: {},         // 已结伴灵宠 { id: true }
+  tribDone: false,  // 本境界是否已历天劫
+  tribWins: 0,      // 渡劫成功次数（降低失败率）
   lastSave: Date.now(),
 };
 
@@ -57,7 +62,7 @@ function tapPower() {
   let t = 1;
   if (state.ups.u1) t *= 2;
   if (state.ups.u4) t *= 3;
-  return t * realmMult() * daoyunMult();
+  return t * realmMult() * daoyunMult() * achMult();
 }
 
 /* ---------------- 境界 ---------------- */
@@ -95,12 +100,62 @@ const UPS = [
   { id: 'u6', name: '《大衍诀》',   desc: '灵气产出 ×3',   cost: 3000000, unlock: () => state.realm >= 3 },
 ];
 
+/* ---------------- 成就 · 道果录 ----------------
+   达成即得永久产出加成，加成相互叠加。 */
+const ACHS = [
+  { id: 'a1', name: '初窥门径', desc: '历世累计灵气达 1万',   bonus: 0.05, cond: () => state.totalAll >= 1e4 },
+  { id: 'a2', name: '腰缠万贯', desc: '历世累计灵气达 100万', bonus: 0.05, cond: () => state.totalAll >= 1e6 },
+  { id: 'a3', name: '富可敌国', desc: '历世累计灵气达 10亿',  bonus: 0.10, cond: () => state.totalAll >= 1e9 },
+  { id: 'a4', name: '破而后立', desc: '首次突破境界',         bonus: 0.05, cond: () => state.realm >= 1 },
+  { id: 'a5', name: '金丹大道', desc: '修至金丹期',           bonus: 0.10, cond: () => state.realm >= 2 },
+  { id: 'a6', name: '广收门徒', desc: '门下弟子共 50 名',     bonus: 0.10, cond: () => GENS.reduce((s, g) => s + (state.gens[g.id] || 0), 0) >= 50 },
+  { id: 'a7', name: '轮回往生', desc: '完成一次转世轮回',     bonus: 0.10, cond: () => state.runs >= 1 },
+  { id: 'a8', name: '闭关奇遇', desc: '单次闭关收益达 1万',   bonus: 0.05, cond: () => state.bestOffline >= 1e4 },
+];
+function achMult() {
+  let m = 1;
+  for (const a of ACHS) if (state.achs[a.id]) m += a.bonus;
+  return m;
+}
+function checkAchs(silent) {
+  for (const a of ACHS) {
+    if (state.achs[a.id] || !a.cond()) continue;
+    state.achs[a.id] = true;
+    if (!silent) showToast('★ 道果达成 · ' + a.name + '（灵气产出 +' + Math.round(a.bonus * 100) + '%）');
+  }
+}
+let toastTimer = 0;
+function showToast(text) {
+  const t = $('toast');
+  if (!t) return;
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function renderAchs() {
+  const list = $('achList');
+  if (!list) return;
+  list.innerHTML = '';
+  ACHS.forEach((a) => {
+    const done = !!state.achs[a.id];
+    const item = document.createElement('div');
+    item.className = 'ach-item' + (done ? ' done' : '');
+    item.innerHTML =
+      '<span class="ach-mark">' + (done ? '✓' : '○') + '</span>' +
+      '<span class="ach-name">' + a.name + '</span>' +
+      '<span class="ach-desc">' + a.desc + '</span>' +
+      '<b class="ach-bonus">+' + Math.round(a.bonus * 100) + '%</b>';
+    list.appendChild(item);
+  });
+}
+
 /* ---------------- 存档 ---------------- */
 function defaultState() {
   return {
     qi: 0, totalRun: 0, totalAll: 0, realm: 0,
     gens: {}, ups: {}, daoyun: 0, runs: 0,
-    achs: {}, bestOffline: 0,
+    achs: {}, bestOffline: 0, pets: {}, tribDone: false, tribWins: 0,
     lastSave: Date.now(),
   };
 }
@@ -218,7 +273,6 @@ function applyOffline() {
   state.qi += gain;
   state.totalRun += gain;
   state.totalAll += gain;
-  if (gain > (state.bestOffline || 0)) state.bestOffline = gain;
   el.offGain.textContent = '+' + fmt(gain);
   document.querySelector('#modalOffline .modal-text').innerHTML =
     '小修士匆匆跑来：<br>「师尊闭关 <b>' + fmtDur(elapsed) +
@@ -425,11 +479,11 @@ function init() {
   loadState();
   bindUI();
   applyOffline();
-  checkAchs(true); // 老存档已有达标的成就先静默补记，不刷提示
   renderMain();
   lastSig = '';
   tickShop();
   renderPrestige();
+  checkAchs(true); // 老存档已有达标的成就先静默补记，不刷提示
   requestAnimationFrame(tick);
 
   setInterval(saveState, 5000);
